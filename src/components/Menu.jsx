@@ -13,7 +13,7 @@ export default function Menu({ items, onAdd }) {
               {items
                 .filter((i) => i.category === group)
                 .map((item) => (
-                  <div className="col-md-6 col-xl-4" key={item.id}>
+                  <div className="col-md-6 col-xl-4" key={item._id || item.id}>
                     <div
                       className="card menu-card h-100 border-0 shadow-sm"
                       role="button"

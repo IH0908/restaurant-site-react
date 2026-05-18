@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 import Navbar from './components/Navbar'
 import Hero from './components/Hero'
 import Menu from './components/Menu'
@@ -9,7 +9,34 @@ import Cart from './components/Cart'
 import Footer from './components/Footer'
 
 export default function App() {
-  const menuItems = useMemo(() => ([
+  const [menuItems, setMenuItems] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [cart, setCart] = useState([])
+  const [orderStatus, setOrderStatus] = useState('')
+
+  // Fetch menu items from backend
+  useEffect(() => {
+    const fetchMenuItems = async () => {
+      try {
+        setLoading(true)
+        const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+        const response = await fetch(`${API_BASE}/api/menu`)
+        if (!response.ok) throw new Error('Failed to fetch menu')
+        const data = await response.json()
+        setMenuItems(data)
+      } catch (error) {
+        console.error('Error fetching menu:', error)
+        setMenuItems([])
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchMenuItems()
+  }, [])
+
+  // Old hardcoded menu items - kept for fallback
+  const fallbackMenuItems = [
     {
       id: 1,
       name: 'Truffle Fries',
@@ -58,7 +85,7 @@ export default function App() {
       image: 'https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=900&q=80',
       desc: 'Ask about today’s flavor.',
     },
-  ]), [])
+  ]
 
   const galleryImages = [
     'https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=1200&q=80',
@@ -69,17 +96,16 @@ export default function App() {
     'https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=80',
   ]
 
-  const [cart, setCart] = useState([])
-
   const addToCart = (item) => {
     setCart(prev => {
-      const existing = prev.find(i => i.id === item.id)
+      const itemId = item.id || item._id
+      const existing = prev.find(i => i.id === itemId)
       if (existing) {
         return prev.map(i =>
-          i.id === item.id ? { ...i, qty: i.qty + 1 } : i
+          i.id === itemId ? { ...i, qty: i.qty + 1 } : i
         )
       }
-      return [...prev, { ...item, qty: 1 }]
+      return [...prev, { ...item, id: itemId, qty: 1 }]
     })
   }
 
@@ -99,6 +125,33 @@ export default function App() {
     setCart([])
   }
 
+  const submitOrder = async (orderData) => {
+    try {
+      setOrderStatus('submitting')
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:5001'
+      const response = await fetch(`${API_BASE}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(orderData),
+      })
+
+      if (!response.ok) throw new Error('Failed to submit order')
+      
+      const data = await response.json()
+      setOrderStatus('success')
+      clearCart()
+      setTimeout(() => setOrderStatus(''), 3000)
+      return data
+    } catch (error) {
+      console.error('Error submitting order:', error)
+      setOrderStatus('error')
+      setTimeout(() => setOrderStatus(''), 3000)
+      throw error
+    }
+  }
+
   const total = cart.reduce((sum, item) => sum + item.price * item.qty, 0)
 
   return (
@@ -116,6 +169,8 @@ export default function App() {
           onDec={(id) => updateQty(id, -1)}
           onRemove={removeItem}
           onClear={clearCart}
+          onSubmitOrder={submitOrder}
+          orderStatus={orderStatus}
         />
         <Contact />
       </main>
